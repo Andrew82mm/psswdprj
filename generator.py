@@ -2,11 +2,22 @@ import random
 import re
 from collections import defaultdict
 
+def random_capitalize(s: str, probability: float = 0.3) -> str:
+    result = []
+    for ch in s:
+        if ch.isalpha() and random.random() < probability:
+            result.append(ch.upper())
+        else:
+            result.append(ch)
+    return "".join(result)
+
 class MarkovPasswordGenerator:
     """
     Генератор паролей на основе Марковских цепей.
     Анализирует текстовый файл для создания "словоподобных" паролей.
     """
+    # ВАЖНО: Убедись, что ваш файл 'corpus.txt' содержит достаточно большой текст
+    # на одном языке (например, только русский). Чем больше текст, тем лучше.
 
     def __init__(self, corpus_file_path: str, chain_order: int = 2):
         """
@@ -84,16 +95,14 @@ class MarkovPasswordGenerator:
             insert_pos = random.randint(1, len(password_base) - 1)
             password_base = password_base[:insert_pos] + char_to_add + password_base[insert_pos:]
             
-        # 3. Финальная обработка: делаем первую букву заглавной и обрезаем
-        final_password = password_base[:length].capitalize()
+        # 3. Финальная обработка: делаем случайные буквы заглавными и обрезаем
+        final_password = random_capitalize(password_base[:length])
+
         
         return final_password
 
-# --- Пример использования ---
+# --- Проверка ---
 if __name__ == "__main__":
-    # ВАЖНО: Убедись, что твой файл 'corpus.txt' содержит достаточно большой текст
-    # на одном языке (например, только русский). Чем больше текст, тем лучше.
-    # Удали из него лишние заголовки, оглавления и т.д.
     
     # Создаем экземпляр генератора
     generator = MarkovPasswordGenerator('corpus.txt', chain_order=2)
