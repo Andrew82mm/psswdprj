@@ -1,6 +1,6 @@
 # Byte-compiled / optimized / DLL files
 key.salt
-password.db
+passwords.db
 corpus.txt
 __pycache__/
 *.py[codz]
