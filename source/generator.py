@@ -111,7 +111,7 @@ class MarkovPasswordGenerator:
 
 # --- Проверка ---
 if __name__ == "__main__":
-    generator = MarkovPasswordGenerator('corpus.txt', chain_order=2)
+    generator = MarkovPasswordGenerator('../data/corpus.txt', chain_order=2)
 
     print("\n--- Сгенерированные пароли ---")
     for _ in range(5):

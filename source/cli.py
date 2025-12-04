@@ -2,9 +2,11 @@ import typer
 import getpass
 import pyperclip 
 import os
-from generator import MarkovPasswordGenerator
-from vault import PasswordVault
+from source.generator import MarkovPasswordGenerator
+from source.vault import PasswordVault
 from typing import Annotated, Optional
+from pathlib import Path
+from source import DATA_DIR
 
 # Создаем приложение Typer
 app = typer.Typer(help="Менеджер паролей с генератором на основе цепей Маркова.")
@@ -21,11 +23,11 @@ def _get_vault() -> Optional[PasswordVault]:
         return PasswordVault(master_password)
     except FileNotFoundError:
         # Это сработает, если отсутствует файл с солью, что может быть нормально при первом запуске
-        typer.secho("❌ Ошибка при инициализации хранилища. Проверьте правильность пути или убедитесь, что файлы vault.py и key.salt доступны.", fg=typer.colors.RED)
+        typer.secho(" Ошибка при инициализации хранилища. Проверьте правильность пути или убедитесь, что файлы vault.py и key.salt доступны.", fg=typer.colors.RED)
         return None
     except Exception as e:
         # Ловит ошибку расшифровки (неверный пароль) или другие ошибки KDF
-        typer.secho("❌ Неверный МАСТЕР-ПАРОЛЬ или поврежден файл ключа.", fg=typer.colors.RED)
+        typer.secho(" Неверный МАСТЕР-ПАРОЛЬ или поврежден файл ключа.", fg=typer.colors.RED)
         return None
 
 # --- КОМАНДЫ ГЕНЕРАЦИИ И ОБУЧЕНИЯ ---
@@ -34,7 +36,7 @@ def _get_vault() -> Optional[PasswordVault]:
 def generate(
     length: int = typer.Option(16, "--length", "-l", help="Длина пароля"),
     count: int = typer.Option(1, "--count", "-c", help="Количество паролей"),
-    corpus: str = typer.Option("corpus.txt", help="Путь к файлу с текстом"),
+    corpus: str = typer.Option(str(DATA_DIR / "corpus.txt"), help="Путь к файлу с текстом"),
     service: Annotated[Optional[str], typer.Option("--save", help="Имя сервиса, куда сохранить пароль.")] = None,
 ):
     """
@@ -84,7 +86,7 @@ def generate(
 
 @app.command()
 def train(
-    corpus: str = typer.Option("corpus.txt", help="Путь к новому тексту")
+    corpus: str = typer.Option(str(DATA_DIR / "corpus.txt"), help="Путь к новому тексту")
 ):
     """
     Принудительно переобучает модель (если вы изменили текст в corpus.txt).
@@ -135,7 +137,7 @@ def get(
     
     if result:
         username, password = result
-        typer.secho(f"\n🗝️ Сервис: {service}", fg=typer.colors.BLUE)
+        typer.secho(f"\n Сервис: {service}", fg=typer.colors.BLUE)
         typer.secho(f"   Логин: {username}", fg=typer.colors.WHITE)
         
         if copy:
