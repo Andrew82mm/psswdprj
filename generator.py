@@ -1,8 +1,13 @@
 import random
 import re
 from collections import defaultdict
+from functools import lru_cache
+
 
 def random_capitalize(s: str, probability: float = 0.3) -> str:
+    """
+    Делает случайные буквы заглавными с указанной вероятностью.
+    """
     result = []
     for ch in s:
         if ch.isalpha() and random.random() < probability:
@@ -11,38 +16,34 @@ def random_capitalize(s: str, probability: float = 0.3) -> str:
             result.append(ch)
     return "".join(result)
 
+
 class MarkovPasswordGenerator:
     """
     Генератор паролей на основе Марковских цепей.
-    Анализирует текстовый файл для создания "словоподобных" паролей.
     """
-    # ВАЖНО: Убедись, что ваш файл 'corpus.txt' содержит достаточно большой текст
-    # на одном языке (например, только русский). Чем больше текст, тем лучше.
 
     def __init__(self, corpus_file_path: str, chain_order: int = 2):
-        """
-        Инициализация генератора.
-        :param corpus_file_path: Путь к текстовому файлу для обучения.
-        :param chain_order: Порядок цепи (сколько предыдущих символов учитывать).
-        """
         self.corpus_file_path = corpus_file_path
         self.chain_order = chain_order
         self.model = defaultdict(list)
+        self.start_states = []       # список "хороших" стартовых состояний
         self._build_model()
 
-    def _preprocess_text(self, text: str) -> str:
+    @staticmethod
+    @lru_cache(maxsize=8)
+    def _preprocess_text(text: str) -> str:
         """
-        Очищает текст, оставляя только буквы (кириллицу и латиницу) и переводя в нижний регистр.
-        Это ключевой шаг для получения качественных паролей.
+        Очищает текст, оставляя только буквы (кириллица и латиница).
+        Использует кэширование для ускорения.
         """
-        # Удаляем все, что НЕ является буквой (ни кириллицей, ни латиницей)
-        # [^a-zA-Zа-яА-ЯёЁ] - это регулярное выражение, означающее "любой символ, кроме..."
+        # Удаляем всё, что НЕ буква
         cleaned_text = re.sub(r'[^a-zA-Zа-яА-ЯёЁ]', '', text)
         return cleaned_text.lower()
 
     def _build_model(self):
         """Строит модель Марковской цепи из очищенного текста."""
         print("Построение модели из текстового файла...")
+
         try:
             with open(self.corpus_file_path, 'r', encoding='utf-8') as f:
                 text = f.read()
@@ -50,65 +51,68 @@ class MarkovPasswordGenerator:
             print(f"Ошибка: Файл не найден по пути {self.corpus_file_path}")
             return
 
-        # 1. Очищаем текст перед построением модели
         clean_text = self._preprocess_text(text)
-
         if not clean_text:
-            print("Ошибка: После очистки текста не осталось символов. Проверьте файл корпуса.")
+            print("Ошибка: После очистки текста не осталось символов.")
             return
 
-        # 2. Строим модель из очищенного текста
-        for i in range(len(clean_text) - self.chain_order):
-            state = clean_text[i:i + self.chain_order]
-            next_char = clean_text[i + self.chain_order]
+        N = self.chain_order
+
+        # Строим модель
+        for i in range(len(clean_text) - N):
+            state = clean_text[i:i + N]
+            next_char = clean_text[i + N]
             self.model[state].append(next_char)
-        
-        print(f"Модель построена. Найдено {len(self.model)} уникальных состояний.")
+
+        # Подготовка стартовых состояний — первые символы слов
+        # (улучшает "словоподобность")
+        self.start_states = [
+            clean_text[i:i + N]
+            for i in range(len(clean_text) - N)
+            if i == 0 or clean_text[i - 1] == ' '
+        ]
+
+        # fallback если нет пробелов
+        if not self.start_states:
+            self.start_states = list(self.model.keys())
+
+        print(f"Модель построена. {len(self.model)} уникальных состояний.")
 
     def generate(self, length: int = 12) -> str:
         """
-        Генерирует "словоподобный" пароль заданной длины.
+        Генерирует словоподобный пароль.
+        Интерфейс полностью сохранён.
         """
         if not self.model:
             return "Ошибка: Модель не построена."
 
-        # 1. Генерируем основу пароля - слово
-        # Выбираем случайное начальное состояние, состоящее только из букв
-        start_state = random.choice(list(self.model.keys()))
+        # 1. Выбираем начальное состояние
+        # (теперь предпочтительно начало строки/слова)
+        start_state = random.choice(self.start_states)
         password_base = start_state
 
-        while len(password_base) < length - 2: # Оставляем место для символов
-            current_state = password_base[-self.chain_order:]
-            if current_state not in self.model:
-                break
-            next_char = random.choice(self.model[current_state])
-            password_base += next_char
+        # 2. Генерация символов
+        while len(password_base) < length:
+            state = password_base[-self.chain_order:]
+            next_chars = self.model.get(state)
 
-        # 2. Усиливаем пароль для надежности
-        # Добавляем случайные цифры и символы
-        symbols = "!@#$%^&*"
-        digits = "0123456789"
-        
-        # Добавляем 2 случайных символа в случайные места
-        for _ in range(2):
-            char_to_add = random.choice(symbols + digits)
-            insert_pos = random.randint(1, len(password_base) - 1)
-            password_base = password_base[:insert_pos] + char_to_add + password_base[insert_pos:]
-            
-        # 3. Финальная обработка: делаем случайные буквы заглавными и обрезаем
+            if not next_chars:
+                # fallback: выбрать случайное состояние и продолжить
+                state = random.choice(list(self.model.keys()))
+                next_chars = self.model[state]
+
+            password_base += random.choice(next_chars)
+
+        # 3. Случайные заглавные буквы
         final_password = random_capitalize(password_base[:length])
 
-        
         return final_password
+
 
 # --- Проверка ---
 if __name__ == "__main__":
-    
-    # Создаем экземпляр генератора
     generator = MarkovPasswordGenerator('corpus.txt', chain_order=2)
 
-    # Генерируем несколько паролей
     print("\n--- Сгенерированные пароли ---")
     for _ in range(5):
-        password = generator.generate(length=10)
-        print(password)
+        print(generator.generate(length=15))
