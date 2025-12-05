@@ -6,6 +6,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+tex/*.*
+!tex/*.tex
+!tex/*.pdf
+
 # C extensions
 *.so
 

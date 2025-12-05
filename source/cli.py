@@ -1,5 +1,3 @@
-# source/cli.py
-
 import typer
 import getpass
 import pyperclip 

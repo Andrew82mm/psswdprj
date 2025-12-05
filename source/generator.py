@@ -1,11 +1,9 @@
-# source/generator.py
-
 import random
 import re
-import pickle  # <-- Импортируем pickle
+import pickle
 from collections import defaultdict
 from functools import lru_cache
-from pathlib import Path # <-- Импортируем Path
+from pathlib import Path
 
 # Импортируем пути к данным
 from source import MODEL_PATH, CORPUS_PATH, PACKAGE_DATA_DIR
