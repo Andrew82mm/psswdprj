@@ -8,7 +8,6 @@ from pathlib import Path
 # Импортируем пути к данным
 from source import MODEL_PATH, CORPUS_PATH, PACKAGE_DATA_DIR
 
-
 def random_capitalize(s: str, probability: float = 0.3) -> str:
     """
     Делает случайные буквы заглавными с указанной вероятностью.
@@ -20,7 +19,6 @@ def random_capitalize(s: str, probability: float = 0.3) -> str:
         else:
             result.append(ch)
     return "".join(result)
-
 
 class MarkovPasswordGenerator:
     """
@@ -66,12 +64,13 @@ class MarkovPasswordGenerator:
         print("Модель успешно сохранена.")
 
     @staticmethod
-    @lru_cache(maxsize=8)
+    @lru_cache(maxsize=8) 
     def _preprocess_text(text: str) -> str:
         """
         Очищает текст, оставляя только буквы (кириллица и латиница).
         """
-        cleaned_text = re.sub(r'[^a-zA-Zа-яА-ЯёЁ]', '', text)
+        cleaned_text = re.sub(r'[^a-zA-Zа-яА-ЯёЁ ]', '', text)
+        cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
         return cleaned_text.lower()
 
     def _build_model(self):
@@ -115,7 +114,16 @@ class MarkovPasswordGenerator:
         start_state = random.choice(self.start_states)
         password_base = start_state
 
-        while len(password_base) < length:
+        # вспомогательная функция для подсчёта символов без пробелов
+        def non_space_len(s: str) -> int:
+            return len(s.replace(" ", ""))
+
+        # safeguard — чтобы не застрять в бесконечном цикле
+        max_attempts = max(1000, length * 200)
+        attempts = 0
+
+        while non_space_len(password_base) < length and attempts < max_attempts:
+            attempts += 1
             state = password_base[-self.chain_order:]
             next_chars = self.model.get(state)
 
@@ -125,5 +133,15 @@ class MarkovPasswordGenerator:
 
             password_base += random.choice(next_chars)
 
-        final_password = random_capitalize(password_base[:length])
+         # Если достигнут предел попыток, продолжаем, но дополняем случайными буквами,
+        # чтобы обеспечить требуемую длину (без пробелов).
+        if non_space_len(password_base) < length:
+            needed = length - non_space_len(password_base)
+            # добавим случайные буквы (латиница, нижний регистр)
+            for _ in range(needed):
+                password_base += random.choice('abcdefghijklmnopqrstuvwxyz')
+
+        final_no_spaces = "".join(ch for ch in password_base if ch != " ")[:length]
+        final_password = random_capitalize(final_no_spaces)
         return final_password
+    
