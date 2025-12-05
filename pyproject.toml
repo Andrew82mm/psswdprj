@@ -9,7 +9,14 @@ dependencies = [
     "typer",
     "pyperclip",
     "cryptography",
+    "platformdirs",
 ]
 
 [project.scripts]
 pwdman = "source.cli:app"
+
+[tool.setuptools]
+packages = ["source"]
+
+[tool.setuptools.package-data]
+source = ["data/corpus.txt"]

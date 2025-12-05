@@ -5,11 +5,12 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import Fernet
 from typing import Optional
+from source import PACKAGE_DATA_DIR
 
 class PasswordVault:
     """Класс для управления зашифрованной базой паролей."""
-    DB_PATH = 'passwords.db'
-    SALT_PATH = 'key.salt' # Это не специальное расширений файлов, а просто набор сырых байтов, названо ради удобства
+    DB_PATH = PACKAGE_DATA_DIR / 'passwords.db'
+    SALT_PATH = PACKAGE_DATA_DIR / 'key.salt' # Это не специальное расширений файлов, а просто набор сырых байтов, названо ради удобства
     ITERATIONS = 480000 # Рекомендованное количество итераций для KDF
 
     def __init__(self, master_password: str):

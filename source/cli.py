@@ -1,3 +1,5 @@
+# source/cli.py
+
 import typer
 import getpass
 import pyperclip 
@@ -6,7 +8,9 @@ from source.generator import MarkovPasswordGenerator
 from source.vault import PasswordVault
 from typing import Annotated, Optional
 from pathlib import Path
-from source import DATA_DIR
+
+# Импортируем пути к данным
+from source import CORPUS_PATH, MODEL_PATH, PACKAGE_DATA_DIR
 
 # Создаем приложение Typer
 app = typer.Typer(help="Менеджер паролей с генератором на основе цепей Маркова.")
@@ -15,28 +19,25 @@ app = typer.Typer(help="Менеджер паролей с генераторо�
 def _get_vault() -> Optional[PasswordVault]:
     """Запрашивает мастер-пароль и инициализирует хранилище."""
     try:
-        # getpass скрывает ввод пароля в терминале
         master_password = getpass.getpass("Введите МАСТЕР-ПАРОЛЬ: ")
         if not master_password:
             typer.secho("Мастер-пароль не может быть пустым.", fg=typer.colors.RED)
             return None
         return PasswordVault(master_password)
     except FileNotFoundError:
-        # Это сработает, если отсутствует файл с солью, что может быть нормально при первом запуске
         typer.secho(" Ошибка при инициализации хранилища. Проверьте правильность пути или убедитесь, что файлы vault.py и key.salt доступны.", fg=typer.colors.RED)
         return None
     except Exception as e:
-        # Ловит ошибку расшифровки (неверный пароль) или другие ошибки KDF
         typer.secho(" Неверный МАСТЕР-ПАРОЛЬ или поврежден файл ключа.", fg=typer.colors.RED)
         return None
 
-# --- КОМАНДЫ ГЕНЕРАЦИИ И ОБУЧЕНИЯ ---
+# --- КОМАНДЫ ---
 
 @app.command()
 def generate(
     length: int = typer.Option(16, "--length", "-l", help="Длина пароля"),
     count: int = typer.Option(1, "--count", "-c", help="Количество паролей"),
-    corpus: str = typer.Option(str(DATA_DIR / "corpus.txt"), help="Путь к файлу с текстом"),
+    corpus: str = typer.Option(str(CORPUS_PATH), help="Путь к файлу с текстом"),
     service: Annotated[Optional[str], typer.Option("--save", help="Имя сервиса, куда сохранить пароль.")] = None,
 ):
     """
@@ -48,6 +49,7 @@ def generate(
         raise typer.BadParameter("Количество (count) должно быть в диапазоне 1–100.")
 
     try:
+        # Генератор сам решит, загружать модель или строить её
         gen = MarkovPasswordGenerator(corpus_file_path=corpus)
         typer.secho(f"\nГенерируем {count} пароль(ей) длиной {length}...", fg=typer.colors.BLUE)
         
@@ -59,10 +61,8 @@ def generate(
             
         typer.echo("")
         
-        # Логика сохранения
         if service and generated_passwords:
             if count > 1:
-                # Если сгенерировано несколько, сохраняем только первый
                 typer.secho(" Сохраняется только первый сгенерированный пароль.", fg=typer.colors.YELLOW)
                 pwd_to_save = generated_passwords[0]
             else:
@@ -79,26 +79,26 @@ def generate(
 
     except FileNotFoundError as e:
         typer.secho(f"Ошибка: {e}", fg=typer.colors.RED)
-        typer.echo("Проверьте наличие файла корпуса (corpus.txt).")
+        typer.echo(f"Проверьте наличие файла корпуса. Он должен быть здесь: {CORPUS_PATH}")
     except Exception as e:
         typer.secho(f"Произошла непредвиденная ошибка: {e}", fg=typer.colors.RED)
 
 
 @app.command()
 def train(
-    corpus: str = typer.Option(str(DATA_DIR / "corpus.txt"), help="Путь к новому тексту")
+    corpus: str = typer.Option(str(CORPUS_PATH), help="Путь к новому тексту")
 ):
     """
     Принудительно переобучает модель (если вы изменили текст в corpus.txt).
     """
-    if os.path.exists("model.pkl"):
-        os.remove("model.pkl")
+    if MODEL_PATH.exists():
+        MODEL_PATH.unlink() # Используем pathlib для удаления
         typer.secho("Старая модель удалена.", fg=typer.colors.YELLOW)
     
     try:
         # Принудительно запускает перестроение модели
-        gen = MarkovPasswordGenerator(corpus_file_path=corpus)
-        typer.secho(" Модель успешно переобучена!", fg=typer.colors.GREEN)
+        gen = MarkovPasswordGenerator(corpus_file_path=corpus, force_rebuild=True)
+        typer.secho(" Модель успешно переобучена и сохранена!", fg=typer.colors.GREEN)
     except Exception as e:
         typer.secho(f"Ошибка обучения: {e}", fg=typer.colors.RED)
 
@@ -161,7 +161,6 @@ def delete(
     if not vault:
         return
     
-    # Подтверждение удаления
     confirm = typer.confirm(f" Вы уверены, что хотите удалить пароль для '{service}'?")
     if not confirm:
         typer.secho("Отменено.", fg=typer.colors.YELLOW)
@@ -184,7 +183,6 @@ def reset(
     if not vault:
         return
     
-    # Двойное подтверждение для безопасности
     if not force:
         typer.secho("\n ВНИМАНИЕ ", fg=typer.colors.RED, bold=True)
         typer.secho("Эта операция удалит ВСЕ сохраненные пароли!", fg=typer.colors.RED)
@@ -222,6 +220,5 @@ def list_passwords():
     else:
         typer.secho("База данных пуста.", fg=typer.colors.YELLOW)
 
-# Добавляем вызов основного приложения Typer
 if __name__ == "__main__":
     app()
