@@ -107,12 +107,3 @@ class MarkovPasswordGenerator:
         final_password = random_capitalize(password_base[:length])
 
         return final_password
-
-
-# --- Проверка ---
-if __name__ == "__main__":
-    generator = MarkovPasswordGenerator('../data/corpus.txt', chain_order=2)
-
-    print("\n--- Сгенерированные пароли ---")
-    for _ in range(5):
-        print(generator.generate(length=15))
